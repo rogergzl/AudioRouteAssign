@@ -1,6 +1,6 @@
 # 音频输出通道分配 · AudioRouteAssign
 
-为 Windows 上的每一个应用，单独指定音频输出与输入设备。原生 Rust + egui 编写，单个 exe 常驻托盘，不引入 Electron、不依赖 .NET 运行时。
+为 Windows 上的每一个应用，单独指定音频输出与输入设备。单个 exe，双击即用，常驻托盘。
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -39,7 +39,7 @@ Windows 自带的音量合成器只能调整每个应用的音量，不能为不
 
 从 [Releases](../../releases/latest) 下载 `audio-route-assign.exe`，双击运行。
 
-- 单文件，无需安装，无需 .NET / VC++ 运行库（CRT 静态链接）
+- 单文件，下载即用，无需安装
 - 启动会弹出 UAC：修改系统音频策略需要管理员权限
 - 程序同一时刻只保留一份：已在运行时再次双击，只会唤出原窗口，不会新开进程、也不会再弹 UAC
 - 配置文件：`%LOCALAPPDATA%\AudioRouteAssign\config.json`
@@ -68,7 +68,7 @@ Windows 自带的音量合成器只能调整每个应用的音量，不能为不
 
 - 使用的是 Windows 未公开接口，系统大版本更新后可能失效；失效时软件仍保存规则，并在日志中提示策略接口不可用
 - 策略在**会话建立时**被读取，已在运行的应用通常需要重启才会切换到目标设备
-- 仅支持 Windows 10 / 11 x64；未做 ARM64 版本
+- 仅支持 Windows 10 / 11 x64
 - 需要管理员权限，普通权限下无法修改音频路由
 
 ## 免责声明
