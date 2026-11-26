@@ -1,0 +1,78 @@
+# 音频输出通道分配 · AudioRouteAssign
+
+为 Windows 上的每一个应用，单独指定音频输出与输入设备。原生 Rust + egui 编写，单个 exe 常驻托盘，不引入 Electron、不依赖 .NET 运行时。
+
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Size](https://img.shields.io/badge/exe-3.6%20MB-blue)
+
+![主界面](src/01-overview.png)
+
+> 截图中进程名与设备端点 ID 已打码处理。
+
+## 它解决什么问题
+
+Windows 自带的音量合成器只能调整每个应用的音量，不能为不同应用指定不同声卡。开会时把微信语音放到耳机、把音乐留在音箱、把游戏丢到虚拟声卡（给直播/录制用）——这些操作在系统里没有入口。
+
+本工具把「进程 → 音频设备」变成可保存的规则：选一次，之后自动生效。
+
+## 功能
+
+| 能力 | 说明 |
+| --- | --- |
+| 会话枚举 | 列出正在播放/录音的进程，同一进程合并为一组，区分播放与录音 |
+| 独立设备 | 每个进程分别选择输出设备与输入设备，互不影响 |
+| 设备识别 | 自动枚举系统声卡与虚拟声卡（VB-Cable、VoiceMeeter 等），显示设备名称 |
+| 配置持久化 | 自动保存 `进程 → 输入/输出设备 ID` 映射，启动即加载 |
+| 两种模式 | **进程固定绑定**：按 exe 路径长期生效；**临时会话**：只对当前进程生效，重启软件即失效 |
+| 设备备注 | 给设备起别名（如「耳机」「直播虚拟声卡」），下拉框显示备注 + 原始名称 |
+| 托盘常驻 | 关闭窗口最小化到托盘；右键菜单：打开窗口、应用配置、退出 |
+| 开机自启 | 界面开关控制，写入 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` |
+| 测试播放 | 向选中设备播放 440 Hz 短音，验证设备是否可用 |
+| 日志面板 | 记录策略下发、接口探测、错误码，出问题时可直接定位 |
+
+## 下载与运行
+
+从 [Releases](../../releases/latest) 下载 `audio-route-assign.exe`，双击运行。
+
+- 单文件，无需安装，无需 .NET / VC++ 运行库（CRT 静态链接）
+- 启动会弹出 UAC：修改系统音频策略需要管理员权限
+- 配置文件：`%LOCALAPPDATA%\AudioRouteAssign\config.json`
+- 启动日志：`%LOCALAPPDATA%\AudioRouteAssign\startup.log`
+
+## 使用流程
+
+1. 启动程序并确认 UAC 提权
+2. 在「音频会话」中找到目标进程（如 `QQ.exe`）
+3. 在「输出」下拉框选择目标声卡；需要录音应用时同样设置「输入」
+4. 点击「应用配置」写入系统策略
+5. 若该应用已在运行，多数情况下需要重启该应用才会重建音频会话并切到新设备
+6. 需要长期生效时切到「进程固定绑定」模式；只想临时调整就留在「临时会话」
+
+## 工作原理
+
+1. 通过 WASAPI 枚举所有音频端点，逐个读取 `IAudioSessionManager2` 下的会话，取 `IAudioSessionControl2::GetProcessId`，再用 `QueryFullProcessImageNameW` 拿到真实 exe 路径
+2. 调用系统内部的 `Windows.Media.Internal.AudioPolicyConfig`（`RoGetActivationFactory` + IID/vtable 探测），把「进程 → 端点」写入系统音频策略
+3. 设备 ID 两端做格式转换：WASAPI 的端点 ID ↔ 设备接口路径（`\\?\SWD#MMDEVAPI#...#{render/capture GUID}`）
+4. 后台线程轮询会话变化并自动下发规则，日志区分「已生效」与「已写入策略，重建会话后生效」
+
+第三方组件：`eframe`/`egui`、`wasapi`、`tray-icon`、`windows`，均为宽松开源许可。
+
+## 已知限制
+
+- 使用的是 Windows 未公开接口，系统大版本更新后可能失效；失效时软件仍保存规则，并在日志中提示策略接口不可用
+- 策略在**会话建立时**被读取，已在运行的应用通常需要重启才会切换到目标设备
+- 仅支持 Windows 10 / 11 x64；未做 ARM64 版本
+- 需要管理员权限，普通权限下无法修改音频路由
+
+## 免责声明
+
+本软件按「现状」（AS IS）提供，不附带任何明示或暗示的担保。它**不是驱动程序**，不安装内核驱动、不注入进程、不拦截音频流，只调用 Windows 音频策略接口写入「进程 → 设备」偏好；不联网、不上传数据、无遥测。
+
+使用本软件可能导致应用音频被路由到非预期设备、应用无声或系统音频策略被修改，这些影响通常可通过「清除」按钮或在系统声音设置中恢复默认设备消除。在**任何情况下**，作者与贡献者均不对因使用或无法使用本软件而产生的任何直接、间接、偶然、特殊或后果性损害承担责任，包括但不限于数据丢失、业务中断、设备损坏或利润损失。生产环境、直播、录音等关键场景请先自行验证。
+
+本软件以管理员权限运行，请仅从本仓库 Releases 页面下载。Windows 是 Microsoft Corporation 的注册商标，本项目与 Microsoft 无任何关联，未获其背书或认证。
+
+## 版权
+
+[MIT License](LICENSE) © 2026 lindagao
